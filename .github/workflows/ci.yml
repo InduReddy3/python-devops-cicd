@@ -29,3 +29,36 @@ jobs:
 
       - name: Run Flask tests
         run: python -m pytest -v
+
+      - name: Build Docker image
+        run: docker build -t python-devops-cicd:ci .
+
+      - name: Start Docker container
+        run: docker run -d --name python-devops-app -p 127.0.0.1:5000:5000 python-devops-cicd:ci
+
+      - name: Wait for application to start
+        run: |
+          for i in {1..20}; do
+            if curl --fail --silent http://127.0.0.1:5000/health; then
+              echo "Application is ready"
+              exit 0
+            fi
+            echo "Waiting for application... attempt $i"
+            sleep 2
+          done
+          echo "Application failed to become ready"
+          docker logs python-devops-app
+          exit 1
+
+      - name: Test home endpoint
+        run: curl --fail --show-error http://127.0.0.1:5000/
+
+      - name: Test health endpoint
+        run: curl --fail --show-error http://127.0.0.1:5000/health
+
+      - name: Collect logs and clean up container
+        if: always()
+        run: |
+          docker logs python-devops-app || true
+          docker rm -f python-devops-app || true
+
